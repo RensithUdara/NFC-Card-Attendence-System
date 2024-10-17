@@ -27,5 +27,5 @@ def launch_admin_login(on_success):
 
 if __name__ == "__main__":
     def after_login(user):
-        messagebox.showinfo("Welcome", f"Welcome, {user}!")
+        messagebox.showinfo("Welcome ", f"Welcome, {user}!")
     launch_admin_login(after_login)
