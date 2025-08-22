@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import messagebox
 import db_utils
@@ -5,6 +6,7 @@ import nfc
 import time
 import threading
 from datetime import datetime
+import os
 
 SECRET_KEY = "Attendance_v1"
 BLOCK_ADDRESS = 4
@@ -54,8 +56,27 @@ class AttendanceScannerGUI:
                     name = parts[2] if len(parts) > 2 else "UNKNOWN"
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     db_utils.log_attendance(timestamp, employee_id, name, card_uid)
+                    # Show employee photo and info
+                    emp = db_utils.get_employee_by_uid(card_uid)
+                    if emp:
+                        _, _, department, role, photo_path = emp
+                        info = f"ID: {employee_id}\nName: {name}\nDepartment: {department or ''}\nRole: {role or ''}"
+                        if photo_path and os.path.exists(photo_path):
+                            from PIL import Image, ImageTk
+                            img = Image.open(photo_path)
+                            img = img.resize((120, 120))
+                            img_tk = ImageTk.PhotoImage(img)
+                            top = tk.Toplevel(self.root)
+                            top.title("Employee Info")
+                            tk.Label(top, image=img_tk).pack()
+                            tk.Label(top, text=info, font=("Arial", 12)).pack()
+                            top.after(3000, top.destroy)
+                            top.mainloop()
+                        else:
+                            messagebox.showinfo("Success", f"Attendance logged!\n{info}")
+                    else:
+                        messagebox.showinfo("Success", f"Attendance logged for {employee_id} ({name})!")
                     self.status_var.set(f"Attendance logged for {employee_id}.")
-                    messagebox.showinfo("Success", f"Attendance logged for {employee_id} ({name})!")
                 else:
                     self.status_var.set("Card not authorized.")
                     messagebox.showerror("Unauthorized", "This card is not authorized!")
