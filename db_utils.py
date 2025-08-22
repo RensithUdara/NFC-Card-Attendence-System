@@ -1,7 +1,6 @@
 import sqlite3
 import os
 
-def init_db():
 
 DB_FILE = "attendance_system.db"
 
