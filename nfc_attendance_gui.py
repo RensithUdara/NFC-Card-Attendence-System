@@ -89,7 +89,7 @@ class NFCMainApp(tk.Tk):
 
     def show_register(self):
         self.clear_main()
-        RegisterFrame(self.main)
+        EmployeeManagerFrame(self.main)
 
     def show_program(self):
         self.clear_main()
@@ -116,30 +116,96 @@ class NFCMainApp(tk.Tk):
             df.to_excel(file_path, index=False)
             messagebox.showinfo("Exported", f"Attendance exported to {file_path}")
 
-class RegisterFrame(tk.Frame):
+
+# --- Employee Management Frame ---
+class EmployeeManagerFrame(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent, bg=BG)
         self.pack(fill=tk.BOTH, expand=True)
-        self.photo_path = None
-        tk.Label(self, text="Register New Employee", font=("Arial", 16), bg=BG, fg=PRIMARY).pack(pady=10)
-        self.id_var = tk.StringVar()
-        self.name_var = tk.StringVar()
-        self.dept_var = tk.StringVar()
-        self.role_var = tk.StringVar()
-        form = tk.Frame(self, bg=BG)
-        form.pack(pady=10)
-        tk.Label(form, text="Employee ID:", bg=BG, fg=FG).grid(row=0, column=0, sticky=tk.W)
-        tk.Entry(form, textvariable=self.id_var).grid(row=0, column=1)
-        tk.Label(form, text="Name:", bg=BG, fg=FG).grid(row=1, column=0, sticky=tk.W)
-        tk.Entry(form, textvariable=self.name_var).grid(row=1, column=1)
-        tk.Label(form, text="Department:", bg=BG, fg=FG).grid(row=2, column=0, sticky=tk.W)
-        tk.Entry(form, textvariable=self.dept_var).grid(row=2, column=1)
-        tk.Label(form, text="Role:", bg=BG, fg=FG).grid(row=3, column=0, sticky=tk.W)
-        tk.Entry(form, textvariable=self.role_var).grid(row=3, column=1)
-        self.photo_label = tk.Label(form, text="No photo selected.", bg=BG, fg=FG)
-        self.photo_label.grid(row=4, column=0, columnspan=2)
-        tk.Button(form, text="Upload Photo", bg=BTN, fg="white", command=self.upload_photo).grid(row=5, column=0, columnspan=2, pady=5)
-        tk.Button(self, text="Register Employee", bg=PRIMARY, fg="white", command=self.register_employee).pack(pady=10)
+        tk.Label(self, text="Employee Management", font=("Arial", 16), bg=BG, fg=PRIMARY).pack(pady=10)
+        search_frame = tk.Frame(self, bg=BG)
+        search_frame.pack(pady=5)
+        tk.Label(search_frame, text="Search:", bg=BG).pack(side=tk.LEFT)
+        self.search_var = tk.StringVar()
+        tk.Entry(search_frame, textvariable=self.search_var).pack(side=tk.LEFT)
+        tk.Button(search_frame, text="Go", command=self.refresh).pack(side=tk.LEFT, padx=5)
+        self.tree = ttk.Treeview(self, columns=("id", "name", "dept", "role", "photo"), show="headings", height=10)
+        for col, label in zip(["id", "name", "dept", "role", "photo"], ["ID", "Name", "Department", "Role", "Photo"]):
+            self.tree.heading(col, text=label)
+            self.tree.column(col, width=100)
+        self.tree.pack(fill=tk.BOTH, expand=True, pady=5)
+        btn_frame = tk.Frame(self, bg=BG)
+        btn_frame.pack(pady=5)
+        tk.Button(btn_frame, text="Add", bg=BTN, fg="white", command=self.add_employee).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Edit", bg=BTN, fg="white", command=self.edit_employee).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Delete", bg="#E53935", fg="white", command=self.delete_employee).pack(side=tk.LEFT, padx=5)
+        self.refresh()
+
+    def refresh(self):
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+        q = self.search_var.get().lower()
+        for emp in db_utils.get_all_employees():
+            if q and not (q in str(emp[0]).lower() or q in str(emp[1]).lower() or q in str(emp[2]).lower() or q in str(emp[3]).lower()):
+                continue
+            self.tree.insert("", tk.END, values=emp[:5])
+
+    def add_employee(self):
+        EmployeeForm(self, "Add Employee", None, self.refresh)
+
+    def edit_employee(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showerror("Error", "Select an employee to edit.")
+            return
+        emp = self.tree.item(sel[0])["values"]
+        EmployeeForm(self, "Edit Employee", emp, self.refresh)
+
+    def delete_employee(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showerror("Error", "Select an employee to delete.")
+            return
+        emp_id = self.tree.item(sel[0])["values"][0]
+        if messagebox.askyesno("Delete", f"Delete employee {emp_id}?"):
+            conn = db_utils.sqlite3.connect(db_utils.DB_FILE)
+            c = conn.cursor()
+            c.execute("DELETE FROM employees WHERE id=?", (emp_id,))
+            conn.commit()
+            conn.close()
+            self.refresh()
+
+# --- Employee Form Dialog ---
+class EmployeeForm(tk.Toplevel):
+    def __init__(self, parent, title, emp, on_save):
+        super().__init__(parent)
+        self.title(title)
+        self.geometry("350x400")
+        self.on_save = on_save
+        self.photo_path = emp[4] if emp else None
+        self.id_var = tk.StringVar(value=emp[0] if emp else "")
+        self.name_var = tk.StringVar(value=emp[1] if emp else "")
+        self.dept_var = tk.StringVar(value=emp[2] if emp else "")
+        self.role_var = tk.StringVar(value=emp[3] if emp else "")
+        tk.Label(self, text="Employee ID:").pack()
+        tk.Entry(self, textvariable=self.id_var).pack()
+        tk.Label(self, text="Name:").pack()
+        tk.Entry(self, textvariable=self.name_var).pack()
+        tk.Label(self, text="Department:").pack()
+        tk.Entry(self, textvariable=self.dept_var).pack()
+        tk.Label(self, text="Role:").pack()
+        tk.Entry(self, textvariable=self.role_var).pack()
+        self.photo_label = tk.Label(self, text=os.path.basename(self.photo_path) if self.photo_path else "No photo selected.")
+        self.photo_label.pack()
+        tk.Button(self, text="Upload Photo", command=self.upload_photo).pack(pady=5)
+        tk.Button(self, text="Save", command=self.save).pack(pady=10)
+        if self.photo_path and os.path.exists(self.photo_path):
+            img = Image.open(self.photo_path)
+            img = img.resize((100, 100))
+            img_tk = ImageTk.PhotoImage(img)
+            img_label = tk.Label(self, image=img_tk)
+            img_label.image = img_tk
+            img_label.pack()
 
     def upload_photo(self):
         file_path = filedialog.askopenfilename(title="Select Photo", filetypes=[("Image Files", "*.jpg *.jpeg *.png")])
@@ -147,7 +213,7 @@ class RegisterFrame(tk.Frame):
             self.photo_path = file_path
             self.photo_label.config(text=os.path.basename(file_path))
 
-    def register_employee(self):
+    def save(self):
         emp_id = self.id_var.get()
         name = self.name_var.get()
         dept = self.dept_var.get()
@@ -159,7 +225,9 @@ class RegisterFrame(tk.Frame):
             messagebox.showerror("Error", "Employee ID and Name are required.")
             return
         db_utils.add_employee(emp_id, name, None, dept, role, photo, date_joined)
-        messagebox.showinfo("Success", f"Employee {name} registered!")
+        messagebox.showinfo("Success", f"Employee {name} saved!")
+        self.on_save()
+        self.destroy()
 
 class ProgramCardFrame(tk.Frame):
     def __init__(self, parent):
