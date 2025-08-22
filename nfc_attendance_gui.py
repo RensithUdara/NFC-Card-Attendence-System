@@ -47,7 +47,45 @@ class NFCMainApp(tk.Tk):
     def show_dashboard(self):
         self.clear_main()
         tk.Label(self.main, text="NFC Attendance System Dashboard", font=("Arial", 20), bg=BG, fg=PRIMARY).pack(pady=20)
-        # Add summary stats here if desired
+        # --- Dashboard widgets ---
+        stats_frame = tk.Frame(self.main, bg=BG)
+        stats_frame.pack(pady=10)
+        # Get stats
+        employees = db_utils.get_all_employees()
+        total_employees = len(employees)
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        conn = db_utils.sqlite3.connect(db_utils.DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(DISTINCT employee_id) FROM attendance WHERE substr(timestamp,1,10)=?", (today,))
+        present_today = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM blacklist")
+        blacklisted = c.fetchone()[0]
+        c.execute("SELECT timestamp, employee_id, name, event_type FROM attendance ORDER BY timestamp DESC LIMIT 5")
+        recent = c.fetchall()
+        conn.close()
+        # Stat cards
+        def stat_card(parent, label, value, color, icon=None):
+            f = tk.Frame(parent, bg=color, bd=2, relief=tk.RIDGE)
+            f.pack(side=tk.LEFT, padx=10)
+            if icon:
+                tk.Label(f, text=icon, font=("Arial", 24), bg=color, fg="white").pack()
+            tk.Label(f, text=label, font=("Arial", 12), bg=color, fg="white").pack()
+            tk.Label(f, text=str(value), font=("Arial", 18, "bold"), bg=color, fg="white").pack()
+        stat_card(stats_frame, "Employees", total_employees, "#43A047", "👤")
+        stat_card(stats_frame, "Present Today", present_today, "#1976D2", "🟢")
+        stat_card(stats_frame, "Blacklisted", blacklisted, "#E53935", "⛔")
+        # Recent activity
+        recent_frame = tk.Frame(self.main, bg=BG)
+        recent_frame.pack(pady=20)
+        tk.Label(recent_frame, text="Recent Attendance Activity", font=("Arial", 14), bg=BG, fg=ACCENT).pack()
+        tree = ttk.Treeview(recent_frame, columns=("time", "id", "name", "event"), show="headings", height=5)
+        for col, label in zip(["time", "id", "name", "event"], ["Time", "ID", "Name", "Event"]):
+            tree.heading(col, text=label)
+            tree.column(col, width=120)
+        tree.pack()
+        for row in recent:
+            tree.insert("", tk.END, values=row)
 
     def show_register(self):
         self.clear_main()
