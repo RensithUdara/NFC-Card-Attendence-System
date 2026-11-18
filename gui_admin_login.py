@@ -1,4 +1,3 @@
-import utils.session
 import tkinter as tk
 from tkinter import messagebox
 import db_utils
